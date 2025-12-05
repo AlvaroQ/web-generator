@@ -145,10 +145,10 @@ async function handleFormSubmit(e) {
         const projectFolder = zip.folder(projectName);
         
         // Generar imágenes Android
-        await generateAndroidImages(projectFolder, imageData, isSvg);
+        await generateAndroidImages(projectFolder, imageData, isSvg, formData.fillColor);
         
         // Generar imágenes iOS
-        await generateIOSImages(projectFolder, imageData, isSvg);
+        await generateIOSImages(projectFolder, imageData, isSvg, formData.fillColor);
         
         // Generar archivos XML
         generateXMLFiles(projectFolder, formData);
@@ -267,7 +267,7 @@ function imageToCanvas(imageData, width, height, isSvg = true) {
 }
 
 // Convertir imagen a imagen con background
-function imageToImageWithBackground(imageData, width, height, backgroundColor, isSvg = true) {
+function imageToImageWithBackground(imageData, width, height, backgroundColor, format = 'image/png', isSvg = true) {
     return imageToCanvas(imageData, width, height, isSvg).then(canvas => {
         const ctx = canvas.getContext('2d');
         
@@ -284,15 +284,16 @@ function imageToImageWithBackground(imageData, width, height, backgroundColor, i
         // Dibujar la imagen encima
         finalCtx.drawImage(canvas, 0, 0, width, height);
         
-        // Convertir a PNG para preview
+        // Convertir al formato solicitado
         return new Promise((resolve, reject) => {
+            const quality = format === 'image/png' ? undefined : 0.95;
             finalCanvas.toBlob((blob) => {
                 if (blob) {
                     resolve(blob);
                 } else {
                     reject(new Error('Error al convertir canvas a blob'));
                 }
-            }, 'image/png', 0.95);
+            }, format, quality);
         });
     });
 }
@@ -391,40 +392,45 @@ function svgToImage(svgContent, width, height) {
 }
 
 // Generar imágenes para Android
-async function generateAndroidImages(projectFolder, imageData, isSvg = true) {
+async function generateAndroidImages(projectFolder, imageData, isSvg = true, backgroundColor = '#FFFFFF') {
     const androidFolder = projectFolder.folder('android');
     
     // Crear carpetas mipmap
     for (const [density, size] of Object.entries(ANDROID_SIZES)) {
         const mipmapFolder = androidFolder.folder(`mipmap-${density}`);
-        
-        // Generar ic_launcher_foreground.webp
-        const foregroundBlob = await imageToWebP(imageData, size, size, isSvg);
-        mipmapFolder.file('ic_launcher_foreground.webp', foregroundBlob);
-        
-        // Generar ic_launcher.webp (mismo que foreground)
-        mipmapFolder.file('ic_launcher.webp', foregroundBlob);
-        
-        // Generar ic_launcher_round.webp (mismo que foreground)
-        mipmapFolder.file('ic_launcher_round.webp', foregroundBlob);
+        const iconBlob = await imageToImageWithBackground(
+            imageData,
+            size,
+            size,
+            backgroundColor,
+            'image/webp',
+            isSvg
+        );
+        const iconBuffer = await iconBlob.arrayBuffer();
+        mipmapFolder.file('ic_launcher_foreground.webp', iconBuffer.slice(0));
+        mipmapFolder.file('ic_launcher.webp', iconBuffer.slice(0));
+        mipmapFolder.file('ic_launcher_round.webp', iconBuffer.slice(0));
     }
 }
 
 // Generar imágenes para iOS
-async function generateIOSImages(projectFolder, imageData, isSvg = true) {
+async function generateIOSImages(projectFolder, imageData, isSvg = true, backgroundColor = '#FFFFFF') {
     const iosFolder = projectFolder.folder('ios');
     const appIconFolder = iosFolder.folder('AppIcon.appiconset');
     
     // Generar las 3 variantes de 1024x1024
-    // Normal
-    const normalBlob = await imageToPNG(imageData, IOS_SIZE, IOS_SIZE, isSvg);
-    appIconFolder.file('1024.png', normalBlob);
-    
-    // Dark (mismo para ahora, se puede personalizar después)
-    appIconFolder.file('1024 1.png', normalBlob);
-    
-    // Tinted (mismo para ahora, se puede personalizar después)
-    appIconFolder.file('1024 2.png', normalBlob);
+    const iconBlob = await imageToImageWithBackground(
+        imageData,
+        IOS_SIZE,
+        IOS_SIZE,
+        backgroundColor,
+        'image/png',
+        isSvg
+    );
+    const iconBuffer = await iconBlob.arrayBuffer();
+    appIconFolder.file('1024.png', iconBuffer.slice(0));
+    appIconFolder.file('1024 1.png', iconBuffer.slice(0));
+    appIconFolder.file('1024 2.png', iconBuffer.slice(0));
     
     // Generar Contents.json
     const contentsJson = {
@@ -728,7 +734,7 @@ async function showPreview(formData, imageData, isSvg = true) {
     
     // Generar preview del icono con background
     try {
-        const iconBlob = await imageToImageWithBackground(imageData, 128, 128, formData.fillColor, isSvg);
+        const iconBlob = await imageToImageWithBackground(imageData, 128, 128, formData.fillColor, 'image/png', isSvg);
         const iconUrl = URL.createObjectURL(iconBlob);
         if (iconPreviewEl) {
             iconPreviewEl.src = iconUrl;
