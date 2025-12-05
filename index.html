@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Configuración</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Generador de Configuración</h1>
+            <p>Complete el formulario para generar su proyecto</p>
+        </header>
+
+        <form id="configForm">
+            <div class="form-section">
+                <h2>Configuración <span id="jsonFileName">example</span>.json</h2>
+                
+                <div class="form-group">
+                    <label for="client_id">Client ID:</label>
+                    <input type="text" id="client_id" name="client_id" placeholder="Ingrese client_id">
+                </div>
+
+                <div class="form-group">
+                    <label for="license">License:</label>
+                    <input type="text" id="license" name="license" placeholder="Ingrese license">
+                </div>
+
+                <div class="form-group">
+                    <label for="client_redirect_uri">Client Redirect URI:</label>
+                    <input type="text" id="client_redirect_uri" name="client_redirect_uri" placeholder="Ingrese client_redirect_uri">
+                </div>
+
+                <div class="form-group">
+                    <label for="company_logo">Company Logo (SVG):</label>
+                    <input type="file" id="company_logo" name="company_logo" accept=".svg" required>
+                    <small>Subir archivo SVG que se usará para generar todas las imágenes del icono</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="primary_color">Primary Color:</label>
+                    <input type="text" id="primary_color" name="primary_color" value="0xFFFE5000" placeholder="0xFFFE5000">
+                </div>
+
+                <div class="form-group">
+                    <label for="secure_flag">Secure Flag:</label>
+                    <input type="checkbox" id="secure_flag" name="secure_flag">
+                </div>
+
+                <div class="form-group">
+                    <label for="environment">Environment:</label>
+                    <select id="environment" name="environment">
+                        <option value="PRO">PRO</option>
+                        <option value="DEV">DEV</option>
+                        <option value="TEST">TEST</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="name">Name:</label>
+                    <input type="text" id="name" name="name" placeholder="Ingrese name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="applicationId">Application ID:</label>
+                    <input type="text" id="applicationId" name="applicationId" placeholder="Ingrese applicationId">
+                </div>
+
+                <div class="form-group">
+                    <label for="versionCode">Version Code:</label>
+                    <input type="number" id="versionCode" name="versionCode" value="1" min="1">
+                </div>
+
+                <div class="form-group">
+                    <label for="versionName">Version Name:</label>
+                    <input type="text" id="versionName" name="versionName" value="1.0.0" placeholder="1.0.0">
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>Configuración Android</h2>
+                
+                <div class="form-group">
+                    <label for="fillColor">Fill Color (ic_launcher_background.xml):</label>
+                    <input type="text" id="fillColor" name="fillColor" value="#0D75A1" placeholder="#0D75A1">
+                </div>
+
+                <div class="form-group">
+                    <label for="ic_launcher_background_color">Color (colors.xml):</label>
+                    <input type="text" id="ic_launcher_background_color" name="ic_launcher_background_color" value="#FE5000" placeholder="#FE5000">
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" id="generateBtn" class="btn-primary">Generar</button>
+            </div>
+        </form>
+
+        <!-- Preview Section (hidden initially) -->
+        <div id="previewSection" class="preview-section hidden">
+            <div class="success-message">
+                <h2>✓ Generación exitosa</h2>
+            </div>
+
+            <div class="preview-content">
+                <div class="icon-preview">
+                    <h3 id="projectName"></h3>
+                    <div class="icon-container">
+                        <img id="iconPreview" alt="Icono del proyecto">
+                    </div>
+                </div>
+
+                <div class="screenshots-gallery">
+                    <h3>Screenshots</h3>
+                    <div class="screenshots-grid">
+                        <img id="screenshot1Preview" src="../screenshots/screenshot_1.png" alt="Screenshot 1" class="screenshot">
+                        <img src="../screenshots/screenshot_2.png" alt="Screenshot 2" class="screenshot">
+                        <img src="../screenshots/screenshot_3.png" alt="Screenshot 3" class="screenshot">
+                        <img src="../screenshots/screenshot_4.png" alt="Screenshot 4" class="screenshot">
+                    </div>
+                </div>
+
+                <div class="preview-actions">
+                    <button id="downloadBtn" class="btn-primary">Descargar ZIP</button>
+                    <button id="newProjectBtn" class="btn-secondary">Generar otro proyecto</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="loadingOverlay" class="loading-overlay hidden">
+            <div class="spinner"></div>
+            <p>Generando proyecto...</p>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
+
