@@ -128,8 +128,8 @@ header p {
     transition: all 0.3s;
 }
 
-.step.active ~ .step-line,
-.step.completed ~ .step-line {
+.step.active~.step-line,
+.step.completed~.step-line {
     background: #FE5000;
 }
 
@@ -510,7 +510,9 @@ header p {
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .loading-overlay p {
@@ -545,4 +547,3 @@ header p {
 .hidden {
     display: none !important;
 }
-
