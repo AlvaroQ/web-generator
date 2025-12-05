@@ -170,8 +170,9 @@
                 </div>
 
                 <div class="preview-actions">
-                    <button id="copyResourcesBtn" class="btn-primary">Copiar recursos</button>
+                    <button id="copyResourcesBtn" class="btn-primary">Continuar con la migración</button>
                     <button id="downloadBtn" class="btn-secondary">Descargar ZIP</button>
+                    <button id="editFormBtn" class="btn-secondary">Volver al formulario</button>
                 </div>
             </div>
         </div>
@@ -179,17 +180,22 @@
         <!-- Paso 3: Copiar recursos -->
         <div id="step3" class="step-content">
             <div class="step-header">
-                <h2>Copiar recursos</h2>
+                <h2>Migrando recursos</h2>
             </div>
             <div class="info-box">
-                <p>Este proceso realiza una llamada a Jenkins que ejecuta el siguiente comando:</p>
+                <p>Este proceso realiza una llamada a Jenkins que ejecuta la gradle task:</p>
                 <div class="code-block">
                     <code>:composeApp:importClientConfig -Pclient=<span id="clientNameStep3"></span></code>
                 </div>
-                <p>Este comando incorpora la configuración del cliente al proyecto.</p>
+                
+
+            </div>
+            <div id="step3Loading" class="step-loading hidden">
+                <div class="step-spinner"></div>
+                <p>Copiando recursos del cliente...</p>
             </div>
             <div class="preview-actions">
-                <button id="executeCopyBtn" class="btn-primary">Ejecutar copia de recursos</button>
+                <button id="executeCopyBtn" class="btn-primary">Exportar APKs</button>
                 <button id="backToStep2Btn" class="btn-secondary">Volver</button>
             </div>
         </div>
@@ -206,8 +212,12 @@
                 </div>
                 <p>Este proceso compila la aplicación y genera los archivos APK correspondientes.</p>
             </div>
+            <div id="step4Loading" class="step-loading hidden">
+                <div class="step-spinner"></div>
+                <p>Generando aplicación de cliente...</p>
+            </div>
             <div class="preview-actions">
-                <button id="executeBuildBtn" class="btn-primary">Generar aplicación</button>
+                <button id="executeBuildBtn" class="btn-primary">Generar aplicaciones</button>
                 <button id="backToStep3Btn" class="btn-secondary">Volver</button>
             </div>
         </div>

@@ -22,6 +22,9 @@ const executeCopyBtn = document.getElementById('executeCopyBtn');
 const executeBuildBtn = document.getElementById('executeBuildBtn');
 const backToStep2Btn = document.getElementById('backToStep2Btn');
 const backToStep3Btn = document.getElementById('backToStep3Btn');
+const editFormBtn = document.getElementById('editFormBtn');
+const step3Loading = document.getElementById('step3Loading');
+const step4Loading = document.getElementById('step4Loading');
 
 let generatedZipBlob = null;
 let currentStep = 1;
@@ -44,6 +47,9 @@ if (backToStep2Btn) {
 }
 if (backToStep3Btn) {
     backToStep3Btn.addEventListener('click', () => goToStep(3));
+}
+if (editFormBtn) {
+    editFormBtn.addEventListener('click', () => goToStep(1));
 }
 
 // Selectores de color
@@ -108,29 +114,29 @@ function updateJsonFileName() {
 // Función principal para manejar el envío del formulario
 async function handleFormSubmit(e) {
     e.preventDefault();
-    
+
     // Mostrar loading
     loadingOverlay.classList.remove('hidden');
-    
+
     try {
         // Obtener datos del formulario
         const formData = getFormData();
-        
+
         // Validar que se haya subido una imagen en Company Logo
         const imageFile = document.getElementById('company_logo').files[0];
         if (!imageFile) {
             throw new Error('Por favor, suba un archivo de imagen en Company Logo');
         }
-        
+
         // Validar que sea una imagen
         if (!imageFile.type.startsWith('image/')) {
             throw new Error('El archivo debe ser una imagen (SVG, PNG, JPG, etc.)');
         }
-        
+
         // Detectar si es SVG o imagen normal
         const isSvg = imageFile.type === 'image/svg+xml' || imageFile.name.toLowerCase().endsWith('.svg');
         let imageData = null;
-        
+
         if (isSvg) {
             // Leer el SVG como texto
             imageData = await readFileAsText(imageFile);
@@ -138,43 +144,43 @@ async function handleFormSubmit(e) {
             // Para imágenes normales, leer como blob
             imageData = await readFileAsBlob(imageFile);
         }
-        
+
         // Crear el ZIP
         const zip = new JSZip();
         const projectName = `${formData.environment}-${formData.name}`;
         const projectFolder = zip.folder(projectName);
-        
+
         // Generar imágenes Android
         await generateAndroidImages(projectFolder, imageData, isSvg, formData.fillColor);
-        
+
         // Generar imágenes iOS
         await generateIOSImages(projectFolder, imageData, isSvg, formData.fillColor);
-        
+
         // Generar archivos XML
         generateXMLFiles(projectFolder, formData);
-        
+
         // Generar JSON con nombre dinámico
         const jsonFileName = `${formData.environment}-${formData.name}.json`;
         generateExampleJson(projectFolder, formData, jsonFileName);
-        
+
         // Modificar screenshot_1
         await modifyScreenshot1(projectFolder, formData);
-        
+
         // Generar el ZIP con opciones compatibles con Windows
-        const zipBlob = await zip.generateAsync({ 
-            type: 'blob', 
-            compression: 'DEFLATE', 
+        const zipBlob = await zip.generateAsync({
+            type: 'blob',
+            compression: 'DEFLATE',
             compressionOptions: { level: 6 },
             streamFiles: false
         });
         generatedZipBlob = zipBlob;
-        
+
         // Ocultar loading
         loadingOverlay.classList.add('hidden');
-        
+
         // Mostrar preview y avanzar al paso 2
         await showPreview(formData, imageData, isSvg);
-        
+
     } catch (error) {
         loadingOverlay.classList.add('hidden');
         alert('Error al generar el proyecto: ' + error.message);
@@ -225,13 +231,13 @@ function readFileAsBlob(file) {
 function imageToCanvas(imageData, width, height, isSvg = true) {
     return new Promise((resolve, reject) => {
         const img = new Image();
-        
+
         if (isSvg) {
             // Es SVG, crear blob y cargar
             const svgBlob = new Blob([imageData], { type: 'image/svg+xml;charset=utf-8' });
             const url = URL.createObjectURL(svgBlob);
             img.src = url;
-            
+
             img.onload = () => {
                 const canvas = document.createElement('canvas');
                 canvas.width = width;
@@ -241,7 +247,7 @@ function imageToCanvas(imageData, width, height, isSvg = true) {
                 URL.revokeObjectURL(url);
                 resolve(canvas);
             };
-            
+
             img.onerror = () => {
                 URL.revokeObjectURL(url);
                 reject(new Error('Error al cargar el SVG'));
@@ -249,7 +255,7 @@ function imageToCanvas(imageData, width, height, isSvg = true) {
         } else {
             // Es imagen normal, cargar directamente
             img.src = imageData;
-            
+
             img.onload = () => {
                 const canvas = document.createElement('canvas');
                 canvas.width = width;
@@ -258,7 +264,7 @@ function imageToCanvas(imageData, width, height, isSvg = true) {
                 ctx.drawImage(img, 0, 0, width, height);
                 resolve(canvas);
             };
-            
+
             img.onerror = () => {
                 reject(new Error('Error al cargar la imagen'));
             };
@@ -270,20 +276,20 @@ function imageToCanvas(imageData, width, height, isSvg = true) {
 function imageToImageWithBackground(imageData, width, height, backgroundColor, format = 'image/png', isSvg = true) {
     return imageToCanvas(imageData, width, height, isSvg).then(canvas => {
         const ctx = canvas.getContext('2d');
-        
+
         // Crear un nuevo canvas con el fondo
         const finalCanvas = document.createElement('canvas');
         finalCanvas.width = width;
         finalCanvas.height = height;
         const finalCtx = finalCanvas.getContext('2d');
-        
+
         // Fondo con el color especificado
         finalCtx.fillStyle = backgroundColor;
         finalCtx.fillRect(0, 0, width, height);
-        
+
         // Dibujar la imagen encima
         finalCtx.drawImage(canvas, 0, 0, width, height);
-        
+
         // Convertir al formato solicitado
         return new Promise((resolve, reject) => {
             const quality = format === 'image/png' ? undefined : 0.95;
@@ -336,7 +342,7 @@ function svgToImage(svgContent, width, height) {
             const parser = new DOMParser();
             const svgDoc = parser.parseFromString(svgContent, 'image/svg+xml');
             const svgElement = svgDoc.documentElement;
-            
+
             // Establecer dimensiones si no están definidas
             if (!svgElement.getAttribute('width')) {
                 svgElement.setAttribute('width', width);
@@ -347,26 +353,26 @@ function svgToImage(svgContent, width, height) {
             if (!svgElement.getAttribute('viewBox')) {
                 svgElement.setAttribute('viewBox', `0 0 ${width} ${height}`);
             }
-            
+
             const modifiedSvg = new XMLSerializer().serializeToString(svgElement);
             const svgBlob = new Blob([modifiedSvg], { type: 'image/svg+xml;charset=utf-8' });
             const url = URL.createObjectURL(svgBlob);
-            
+
             const img = new Image();
-            
+
             img.onload = () => {
                 const canvas = document.createElement('canvas');
                 canvas.width = width;
                 canvas.height = height;
                 const ctx = canvas.getContext('2d');
-                
+
                 // Fondo blanco (opcional, para SVGs transparentes)
                 ctx.fillStyle = 'white';
                 ctx.fillRect(0, 0, width, height);
-                
+
                 // Dibujar el SVG en el canvas
                 ctx.drawImage(img, 0, 0, width, height);
-                
+
                 // Convertir a WebP para Android, PNG para iOS
                 const format = width === IOS_SIZE ? 'image/png' : 'image/webp';
                 canvas.toBlob((blob) => {
@@ -378,12 +384,12 @@ function svgToImage(svgContent, width, height) {
                     }
                 }, format, 0.95);
             };
-            
+
             img.onerror = (error) => {
                 URL.revokeObjectURL(url);
                 reject(new Error('Error al cargar el SVG: ' + error.message));
             };
-            
+
             img.src = url;
         } catch (error) {
             reject(new Error('Error al procesar SVG: ' + error.message));
@@ -394,7 +400,7 @@ function svgToImage(svgContent, width, height) {
 // Generar imágenes para Android
 async function generateAndroidImages(projectFolder, imageData, isSvg = true, backgroundColor = '#FFFFFF') {
     const androidFolder = projectFolder.folder('android');
-    
+
     // Crear carpetas mipmap
     for (const [density, size] of Object.entries(ANDROID_SIZES)) {
         const mipmapFolder = androidFolder.folder(`mipmap-${density}`);
@@ -417,7 +423,7 @@ async function generateAndroidImages(projectFolder, imageData, isSvg = true, bac
 async function generateIOSImages(projectFolder, imageData, isSvg = true, backgroundColor = '#FFFFFF') {
     const iosFolder = projectFolder.folder('ios');
     const appIconFolder = iosFolder.folder('AppIcon.appiconset');
-    
+
     // Generar las 3 variantes de 1024x1024
     const iconBlob = await imageToImageWithBackground(
         imageData,
@@ -431,7 +437,7 @@ async function generateIOSImages(projectFolder, imageData, isSvg = true, backgro
     appIconFolder.file('1024.png', iconBuffer.slice(0));
     appIconFolder.file('1024 1.png', iconBuffer.slice(0));
     appIconFolder.file('1024 2.png', iconBuffer.slice(0));
-    
+
     // Generar Contents.json
     const contentsJson = {
         "images": [
@@ -471,14 +477,14 @@ async function generateIOSImages(projectFolder, imageData, isSvg = true, backgro
             "version": 1
         }
     };
-    
+
     appIconFolder.file('Contents.json', JSON.stringify(contentsJson, null, 2));
 }
 
 // Generar archivos XML
 function generateXMLFiles(projectFolder, formData) {
     const androidFolder = projectFolder.folder('android');
-    
+
     // Crear carpeta drawable
     const drawableFolder = androidFolder.folder('drawable');
     const icLauncherBackground = `<?xml version="1.0" encoding="utf-8"?>
@@ -492,7 +498,7 @@ function generateXMLFiles(projectFolder, formData) {
         android:pathData="M0,0h108v108h-108z" />
 </vector>`;
     drawableFolder.file('ic_launcher_background.xml', icLauncherBackground);
-    
+
     // Crear carpeta values
     const valuesFolder = androidFolder.folder('values');
     const colorsXml = `<?xml version="1.0" encoding="utf-8"?>
@@ -501,7 +507,7 @@ function generateXMLFiles(projectFolder, formData) {
 </resources>
 `;
     valuesFolder.file('colors.xml', colorsXml);
-    
+
     // Crear carpeta mipmap-anydpi-v26
     const anydpiFolder = androidFolder.folder('mipmap-anydpi-v26');
     const icLauncher = `<?xml version="1.0" encoding="utf-8"?>
@@ -528,7 +534,7 @@ function generateExampleJson(projectFolder, formData, fileName) {
         versionCode: formData.versionCode,
         versionName: formData.versionName
     };
-    
+
     // Usar UTF-8 encoding explícito para evitar problemas con Windows
     const jsonString = JSON.stringify(exampleJson, null, 2);
     // Asegurar que el JSON se guarde con encoding UTF-8
@@ -542,35 +548,35 @@ async function modifyScreenshot1(projectFolder, formData) {
         const screenshotResponse = await fetch('../screenshots/screenshot_1.png');
         const screenshotBlob = await screenshotResponse.blob();
         const screenshotUrl = URL.createObjectURL(screenshotBlob);
-        
+
         const img = new Image();
         await new Promise((resolve, reject) => {
             img.onload = resolve;
             img.onerror = reject;
             img.src = screenshotUrl;
         });
-        
+
         const canvas = document.createElement('canvas');
         canvas.width = img.width;
         canvas.height = img.height;
         const ctx = canvas.getContext('2d');
-        
+
         // Dibujar la imagen original
         ctx.drawImage(img, 0, 0);
-        
+
         // Obtener el color del formulario (colors.xml)
         const color = formData.ic_launcher_background_color;
         const rgb = hexToRgb(color);
-        
+
         // Reemplazar color naranja (#FE5000) por el color del formulario
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
-        
+
         for (let i = 0; i < data.length; i += 4) {
             const r = data[i];
             const g = data[i + 1];
             const b = data[i + 2];
-            
+
             // Detectar color naranja (#FE5000 = rgb(254, 80, 0)) con tolerancia
             if (Math.abs(r - 254) < 10 && Math.abs(g - 80) < 10 && Math.abs(b - 0) < 10) {
                 data[i] = rgb.r;
@@ -578,39 +584,39 @@ async function modifyScreenshot1(projectFolder, formData) {
                 data[i + 2] = rgb.b;
             }
         }
-        
+
         ctx.putImageData(imageData, 0, 0);
-        
+
         // Agregar texto con el nombre del proyecto
         const projectName = `${formData.environment}-${formData.name}`;
         ctx.fillStyle = color;
         ctx.font = 'bold 48px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        
+
         // Dibujar texto con sombra para mejor legibilidad
         ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
         ctx.shadowBlur = 4;
         ctx.shadowOffsetX = 2;
         ctx.shadowOffsetY = 2;
         ctx.fillText(projectName, canvas.width / 2, 100);
-        
+
         // Convertir a blob
         const modifiedBlob = await new Promise(resolve => {
             canvas.toBlob(resolve, 'image/png');
         });
-        
+
         // Crear carpeta screenshots en el ZIP
         const screenshotsFolder = projectFolder.folder('screenshots');
         screenshotsFolder.file('screenshot_1.png', modifiedBlob);
-        
+
         // Copiar otros screenshots sin modificar
         for (let i = 2; i <= 4; i++) {
             const otherScreenshot = await fetch(`../screenshots/screenshot_${i}.png`);
             const otherBlob = await otherScreenshot.blob();
             screenshotsFolder.file(`screenshot_${i}.png`, otherBlob);
         }
-        
+
         URL.revokeObjectURL(screenshotUrl);
     } catch (error) {
         console.error('Error al modificar screenshot:', error);
@@ -641,18 +647,18 @@ function hexToRgb(hex) {
 // Navegar entre pasos
 function goToStep(step) {
     currentStep = step;
-    
+
     // Ocultar todos los pasos
     document.querySelectorAll('.step-content').forEach(content => {
         content.classList.remove('active');
     });
-    
+
     // Mostrar el paso actual
     const stepContent = document.getElementById(`step${step}`);
     if (stepContent) {
         stepContent.classList.add('active');
     }
-    
+
     // Actualizar stepper
     document.querySelectorAll('.step').forEach((stepEl, index) => {
         const stepNum = index + 1;
@@ -663,7 +669,7 @@ function goToStep(step) {
             stepEl.classList.add('active');
         }
     });
-    
+
     // Actualizar nombres de cliente en pasos 3 y 4
     if (step === 3 || step === 4) {
         const formData = getFormData();
@@ -673,7 +679,7 @@ function goToStep(step) {
             clientNameEl.textContent = clientName;
         }
     }
-    
+
     // Scroll al inicio
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -682,22 +688,20 @@ function goToStep(step) {
 async function handleCopyResources() {
     const formData = getFormData();
     const clientName = `${formData.environment}-${formData.name}`;
-    
-    loadingOverlay.classList.remove('hidden');
-    loadingOverlay.querySelector('p').textContent = 'Copiando recursos...';
-    
+    step3Loading?.classList.remove('hidden');
+
     try {
         // Simular llamada a Jenkins
         await new Promise(resolve => setTimeout(resolve, 2000));
-        
+
         // Aquí iría la llamada real a Jenkins
         // await fetch('jenkins-url', { method: 'POST', body: JSON.stringify({ command: `:composeApp:importClientConfig -Pclient=${clientName}` }) });
-        
-        loadingOverlay.classList.add('hidden');
+
         goToStep(4);
     } catch (error) {
-        loadingOverlay.classList.add('hidden');
         alert('Error al copiar recursos: ' + error.message);
+    } finally {
+        step3Loading?.classList.add('hidden');
     }
 }
 
@@ -705,22 +709,20 @@ async function handleCopyResources() {
 async function handleBuildApp() {
     const formData = getFormData();
     const clientName = `${formData.environment}-${formData.name}`;
-    
-    loadingOverlay.classList.remove('hidden');
-    loadingOverlay.querySelector('p').textContent = 'Generando aplicación...';
-    
+    step4Loading?.classList.remove('hidden');
+
     try {
         // Simular llamada a Jenkins
         await new Promise(resolve => setTimeout(resolve, 3000));
-        
+
         // Aquí iría la llamada real a Jenkins
         // await fetch('jenkins-url', { method: 'POST', body: JSON.stringify({ command: `:composeApp:buildClientBundle -Pclient=${clientName}` }) });
-        
-        loadingOverlay.classList.add('hidden');
+
         alert('¡Aplicación generada exitosamente!');
     } catch (error) {
-        loadingOverlay.classList.add('hidden');
         alert('Error al generar aplicación: ' + error.message);
+    } finally {
+        step4Loading?.classList.add('hidden');
     }
 }
 
@@ -731,7 +733,7 @@ async function showPreview(formData, imageData, isSvg = true) {
     if (projectNameEl) {
         projectNameEl.textContent = projectName;
     }
-    
+
     // Generar preview del icono con background
     try {
         const iconBlob = await imageToImageWithBackground(imageData, 128, 128, formData.fillColor, 'image/png', isSvg);
@@ -742,14 +744,14 @@ async function showPreview(formData, imageData, isSvg = true) {
     } catch (error) {
         console.error('Error al generar preview del icono:', error);
     }
-    
+
     // Mostrar screenshot modificado en el preview
     try {
         await showModifiedScreenshot(formData);
     } catch (error) {
         console.error('Error al mostrar screenshot modificado:', error);
     }
-    
+
     // Avanzar al paso 2
     goToStep(2);
 }
@@ -758,41 +760,41 @@ async function showPreview(formData, imageData, isSvg = true) {
 async function showModifiedScreenshot(formData) {
     const screenshot1Preview = document.getElementById('screenshot1Preview');
     if (!screenshot1Preview) return;
-    
+
     try {
         // Cargar screenshot_1
         const screenshotResponse = await fetch('../screenshots/screenshot_1.png');
         const screenshotBlob = await screenshotResponse.blob();
         const screenshotUrl = URL.createObjectURL(screenshotBlob);
-        
+
         const img = new Image();
         await new Promise((resolve, reject) => {
             img.onload = resolve;
             img.onerror = reject;
             img.src = screenshotUrl;
         });
-        
+
         const canvas = document.createElement('canvas');
         canvas.width = img.width;
         canvas.height = img.height;
         const ctx = canvas.getContext('2d');
-        
+
         // Dibujar la imagen original
         ctx.drawImage(img, 0, 0);
-        
+
         // Obtener el color del formulario (colors.xml)
         const color = formData.ic_launcher_background_color;
         const rgb = hexToRgb(color);
-        
+
         // Reemplazar color naranja (#FE5000) por el color del formulario
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
-        
+
         for (let i = 0; i < data.length; i += 4) {
             const r = data[i];
             const g = data[i + 1];
             const b = data[i + 2];
-            
+
             // Detectar color naranja (#FE5000 = rgb(254, 80, 0)) con tolerancia
             if (Math.abs(r - 254) < 10 && Math.abs(g - 80) < 10 && Math.abs(b - 0) < 10) {
                 data[i] = rgb.r;
@@ -800,31 +802,31 @@ async function showModifiedScreenshot(formData) {
                 data[i + 2] = rgb.b;
             }
         }
-        
+
         ctx.putImageData(imageData, 0, 0);
-        
+
         // Agregar texto con el nombre del proyecto
         const projectName = `${formData.environment}-${formData.name}`;
         ctx.fillStyle = color;
         ctx.font = 'bold 48px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        
+
         // Dibujar texto con sombra para mejor legibilidad
         ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
         ctx.shadowBlur = 4;
         ctx.shadowOffsetX = 2;
         ctx.shadowOffsetY = 2;
         ctx.fillText(projectName, canvas.width / 2, 100);
-        
+
         // Mostrar en el preview
         screenshot1Preview.src = canvas.toDataURL('image/png');
-        
+
         URL.revokeObjectURL(screenshotUrl);
     } catch (error) {
         console.error('Error al modificar screenshot para preview:', error);
     }
-    
+
     // Configurar botón de descarga
     if (downloadBtn) {
         downloadBtn.onclick = () => {
