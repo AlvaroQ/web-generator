@@ -7,9 +7,26 @@
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     background: #FE5000;
+    background-image: url('bfy_white.png');
+    background-repeat: repeat;
+    background-size: 300px 300px;
+    background-position: center;
     min-height: 100vh;
     padding: 20px;
     color: #333;
+    position: relative;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #FE5000;
+    opacity: 0.99;
+    z-index: -1;
 }
 
 .container {
@@ -38,8 +55,172 @@ header p {
     opacity: 0.9;
 }
 
-#configForm {
+/* Stepper */
+.stepper-container {
     padding: 30px;
+    background: white;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.stepper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    position: relative;
+}
+
+.step-number {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #e0e0e0;
+    color: #999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.2em;
+    margin-bottom: 8px;
+    transition: all 0.3s;
+}
+
+.step-label {
+    font-size: 0.9em;
+    color: #999;
+    text-align: center;
+    transition: all 0.3s;
+}
+
+.step.active .step-number {
+    background: #FE5000;
+    color: white;
+}
+
+.step.active .step-label {
+    color: #FE5000;
+    font-weight: 600;
+}
+
+.step.completed .step-number {
+    background: #FE5000;
+    color: white;
+}
+
+.step.completed .step-label {
+    color: #FE5000;
+}
+
+.step-line {
+    flex: 1;
+    height: 2px;
+    background: #e0e0e0;
+    margin: 0 10px;
+    margin-bottom: 20px;
+    transition: all 0.3s;
+}
+
+.step.active ~ .step-line,
+.step.completed ~ .step-line {
+    background: #FE5000;
+}
+
+/* Step Content */
+.step-content {
+    display: none;
+    padding: 30px;
+}
+
+.step-content.active {
+    display: block;
+}
+
+.step-header {
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.step-header h2 {
+    color: #FE5000;
+    font-size: 2em;
+    margin-bottom: 10px;
+}
+
+.step-header p {
+    color: #666;
+    font-size: 1.1em;
+}
+
+.info-box {
+    background: #f9f9f9;
+    border-left: 4px solid #FE5000;
+    padding: 20px;
+    border-radius: 6px;
+    margin-bottom: 30px;
+}
+
+.info-box p {
+    margin-bottom: 15px;
+    line-height: 1.6;
+}
+
+.info-text {
+    display: inline;
+    color: #666;
+    font-style: italic;
+    font-weight: normal;
+    white-space: nowrap;
+}
+
+.secure-flag-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.secure-flag-label input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+.secure-flag-label span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: nowrap;
+    font-weight: normal;
+}
+
+.secure-flag-label span small {
+    font-weight: normal;
+}
+
+.code-block {
+    background: #2d2d2d;
+    color: #f8f8f2;
+    padding: 15px;
+    border-radius: 6px;
+    margin: 15px 0;
+    font-family: 'Courier New', monospace;
+    overflow-x: auto;
+}
+
+.code-block code {
+    color: #f8f8f2;
+    font-size: 0.95em;
+}
+
+#configForm {
+    padding: 0;
 }
 
 .form-section {
@@ -109,6 +290,35 @@ header p {
     margin-top: 5px;
     color: #777;
     font-size: 0.9em;
+}
+
+.color-input-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.color-input-group input[type="text"] {
+    flex: 1;
+}
+
+.color-picker {
+    width: 50px;
+    height: 50px;
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    cursor: pointer;
+    padding: 0;
+    background: none;
+}
+
+.color-picker::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.color-picker::-webkit-color-swatch {
+    border: none;
+    border-radius: 4px;
 }
 
 .form-actions {
@@ -217,6 +427,20 @@ header p {
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 20px;
     margin-top: 20px;
+}
+
+.screenshots-row {
+    display: flex;
+    gap: 20px;
+    margin-top: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.screenshots-row .screenshot {
+    max-width: 200px;
+    flex: 1;
+    min-width: 150px;
 }
 
 .screenshot {

@@ -13,18 +13,80 @@ const IOS_SIZE = 1024;
 // Referencias a elementos del DOM
 const form = document.getElementById('configForm');
 const generateBtn = document.getElementById('generateBtn');
-const previewSection = document.getElementById('previewSection');
 const loadingOverlay = document.getElementById('loadingOverlay');
 const projectNameEl = document.getElementById('projectName');
 const iconPreviewEl = document.getElementById('iconPreview');
 const downloadBtn = document.getElementById('downloadBtn');
-const newProjectBtn = document.getElementById('newProjectBtn');
+const copyResourcesBtn = document.getElementById('copyResourcesBtn');
+const executeCopyBtn = document.getElementById('executeCopyBtn');
+const executeBuildBtn = document.getElementById('executeBuildBtn');
+const backToStep2Btn = document.getElementById('backToStep2Btn');
+const backToStep3Btn = document.getElementById('backToStep3Btn');
 
 let generatedZipBlob = null;
+let currentStep = 1;
 
 // Event listeners
-form.addEventListener('submit', handleFormSubmit);
-newProjectBtn.addEventListener('click', resetForm);
+if (form) {
+    form.addEventListener('submit', handleFormSubmit);
+}
+if (copyResourcesBtn) {
+    copyResourcesBtn.addEventListener('click', () => goToStep(3));
+}
+if (executeCopyBtn) {
+    executeCopyBtn.addEventListener('click', handleCopyResources);
+}
+if (executeBuildBtn) {
+    executeBuildBtn.addEventListener('click', handleBuildApp);
+}
+if (backToStep2Btn) {
+    backToStep2Btn.addEventListener('click', () => goToStep(2));
+}
+if (backToStep3Btn) {
+    backToStep3Btn.addEventListener('click', () => goToStep(3));
+}
+
+// Selectores de color
+document.getElementById('fillColorPicker')?.addEventListener('input', (e) => {
+    document.getElementById('fillColor').value = e.target.value;
+});
+
+document.getElementById('fillColor')?.addEventListener('input', (e) => {
+    if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
+        document.getElementById('fillColorPicker').value = e.target.value;
+    }
+});
+
+document.getElementById('ic_launcher_background_colorPicker')?.addEventListener('input', (e) => {
+    document.getElementById('ic_launcher_background_color').value = e.target.value;
+});
+
+document.getElementById('ic_launcher_background_color')?.addEventListener('input', (e) => {
+    if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
+        document.getElementById('ic_launcher_background_colorPicker').value = e.target.value;
+    }
+});
+
+// Selector de color para Primary Color (formato 0xFF...)
+document.getElementById('primary_colorPicker')?.addEventListener('input', (e) => {
+    const hexColor = e.target.value;
+    // Convertir de #FE5000 a 0xFFFE5000
+    const formattedColor = '0xFF' + hexColor.substring(1).toUpperCase();
+    document.getElementById('primary_color').value = formattedColor;
+});
+
+document.getElementById('primary_color')?.addEventListener('input', (e) => {
+    // Convertir de 0xFFFE5000 a #FE5000
+    const value = e.target.value.trim();
+    if (value.startsWith('0xFF') || value.startsWith('0xff')) {
+        const hexPart = value.substring(4);
+        if (/^[0-9A-F]{6}$/i.test(hexPart)) {
+            document.getElementById('primary_colorPicker').value = '#' + hexPart;
+        }
+    } else if (/^#[0-9A-F]{6}$/i.test(value)) {
+        document.getElementById('primary_colorPicker').value = value;
+    }
+});
 
 // Actualizar nombre del JSON dinámicamente
 document.getElementById('environment').addEventListener('change', updateJsonFileName);
@@ -54,14 +116,28 @@ async function handleFormSubmit(e) {
         // Obtener datos del formulario
         const formData = getFormData();
         
-        // Validar que se haya subido un SVG en Company Logo
-        const svgFile = document.getElementById('company_logo').files[0];
-        if (!svgFile) {
-            throw new Error('Por favor, suba un archivo SVG en Company Logo');
+        // Validar que se haya subido una imagen en Company Logo
+        const imageFile = document.getElementById('company_logo').files[0];
+        if (!imageFile) {
+            throw new Error('Por favor, suba un archivo de imagen en Company Logo');
         }
         
-        // Leer el SVG
-        const svgContent = await readFileAsText(svgFile);
+        // Validar que sea una imagen
+        if (!imageFile.type.startsWith('image/')) {
+            throw new Error('El archivo debe ser una imagen (SVG, PNG, JPG, etc.)');
+        }
+        
+        // Detectar si es SVG o imagen normal
+        const isSvg = imageFile.type === 'image/svg+xml' || imageFile.name.toLowerCase().endsWith('.svg');
+        let imageData = null;
+        
+        if (isSvg) {
+            // Leer el SVG como texto
+            imageData = await readFileAsText(imageFile);
+        } else {
+            // Para imágenes normales, leer como blob
+            imageData = await readFileAsBlob(imageFile);
+        }
         
         // Crear el ZIP
         const zip = new JSZip();
@@ -69,10 +145,10 @@ async function handleFormSubmit(e) {
         const projectFolder = zip.folder(projectName);
         
         // Generar imágenes Android
-        await generateAndroidImages(projectFolder, svgContent);
+        await generateAndroidImages(projectFolder, imageData, isSvg);
         
         // Generar imágenes iOS
-        await generateIOSImages(projectFolder, svgContent);
+        await generateIOSImages(projectFolder, imageData, isSvg);
         
         // Generar archivos XML
         generateXMLFiles(projectFolder, formData);
@@ -96,8 +172,8 @@ async function handleFormSubmit(e) {
         // Ocultar loading
         loadingOverlay.classList.add('hidden');
         
-        // Mostrar preview
-        showPreview(formData, svgContent);
+        // Mostrar preview y avanzar al paso 2
+        await showPreview(formData, imageData, isSvg);
         
     } catch (error) {
         loadingOverlay.classList.add('hidden');
@@ -135,69 +211,123 @@ function readFileAsText(file) {
     });
 }
 
-// Convertir SVG a imagen con background
-function svgToImageWithBackground(svgContent, width, height, backgroundColor) {
+// Leer archivo como blob
+function readFileAsBlob(file) {
     return new Promise((resolve, reject) => {
-        try {
-            // Crear un SVG con dimensiones explícitas
-            const parser = new DOMParser();
-            const svgDoc = parser.parseFromString(svgContent, 'image/svg+xml');
-            const svgElement = svgDoc.documentElement;
-            
-            // Establecer dimensiones si no están definidas
-            if (!svgElement.getAttribute('width')) {
-                svgElement.setAttribute('width', width);
-            }
-            if (!svgElement.getAttribute('height')) {
-                svgElement.setAttribute('height', height);
-            }
-            if (!svgElement.getAttribute('viewBox')) {
-                svgElement.setAttribute('viewBox', `0 0 ${width} ${height}`);
-            }
-            
-            const modifiedSvg = new XMLSerializer().serializeToString(svgElement);
-            const svgBlob = new Blob([modifiedSvg], { type: 'image/svg+xml;charset=utf-8' });
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+// Convertir imagen (SVG o normal) a canvas
+function imageToCanvas(imageData, width, height, isSvg = true) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        
+        if (isSvg) {
+            // Es SVG, crear blob y cargar
+            const svgBlob = new Blob([imageData], { type: 'image/svg+xml;charset=utf-8' });
             const url = URL.createObjectURL(svgBlob);
-            
-            const img = new Image();
+            img.src = url;
             
             img.onload = () => {
                 const canvas = document.createElement('canvas');
                 canvas.width = width;
                 canvas.height = height;
                 const ctx = canvas.getContext('2d');
-                
-                // Fondo con el color especificado
-                ctx.fillStyle = backgroundColor;
-                ctx.fillRect(0, 0, width, height);
-                
-                // Dibujar el SVG en el canvas
                 ctx.drawImage(img, 0, 0, width, height);
-                
-                // Convertir a PNG para preview
-                canvas.toBlob((blob) => {
-                    URL.revokeObjectURL(url);
-                    if (blob) {
-                        resolve(blob);
-                    } else {
-                        reject(new Error('Error al convertir canvas a blob'));
-                    }
-                }, 'image/png', 0.95);
-            };
-            
-            img.onerror = (error) => {
                 URL.revokeObjectURL(url);
-                reject(new Error('Error al cargar el SVG: ' + error.message));
+                resolve(canvas);
             };
             
-            img.src = url;
-        } catch (error) {
-            reject(new Error('Error al procesar SVG: ' + error.message));
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                reject(new Error('Error al cargar el SVG'));
+            };
+        } else {
+            // Es imagen normal, cargar directamente
+            img.src = imageData;
+            
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas);
+            };
+            
+            img.onerror = () => {
+                reject(new Error('Error al cargar la imagen'));
+            };
         }
     });
 }
 
-// Convertir SVG a imagen
+// Convertir imagen a imagen con background
+function imageToImageWithBackground(imageData, width, height, backgroundColor, isSvg = true) {
+    return imageToCanvas(imageData, width, height, isSvg).then(canvas => {
+        const ctx = canvas.getContext('2d');
+        
+        // Crear un nuevo canvas con el fondo
+        const finalCanvas = document.createElement('canvas');
+        finalCanvas.width = width;
+        finalCanvas.height = height;
+        const finalCtx = finalCanvas.getContext('2d');
+        
+        // Fondo con el color especificado
+        finalCtx.fillStyle = backgroundColor;
+        finalCtx.fillRect(0, 0, width, height);
+        
+        // Dibujar la imagen encima
+        finalCtx.drawImage(canvas, 0, 0, width, height);
+        
+        // Convertir a PNG para preview
+        return new Promise((resolve, reject) => {
+            finalCanvas.toBlob((blob) => {
+                if (blob) {
+                    resolve(blob);
+                } else {
+                    reject(new Error('Error al convertir canvas a blob'));
+                }
+            }, 'image/png', 0.95);
+        });
+    });
+}
+
+// Convertir imagen a WebP
+function imageToWebP(imageData, width, height, isSvg = true) {
+    return imageToCanvas(imageData, width, height, isSvg).then(canvas => {
+        return new Promise((resolve, reject) => {
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    resolve(blob);
+                } else {
+                    reject(new Error('Error al convertir canvas a blob'));
+                }
+            }, 'image/webp', 0.95);
+        });
+    });
+}
+
+// Convertir imagen a PNG
+function imageToPNG(imageData, width, height, isSvg = true) {
+    return imageToCanvas(imageData, width, height, isSvg).then(canvas => {
+        return new Promise((resolve, reject) => {
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    resolve(blob);
+                } else {
+                    reject(new Error('Error al convertir canvas a blob'));
+                }
+            }, 'image/png', 0.95);
+        });
+    });
+}
+
+// Convertir SVG a imagen (mantener para compatibilidad)
 function svgToImage(svgContent, width, height) {
     return new Promise((resolve, reject) => {
         try {
@@ -261,7 +391,7 @@ function svgToImage(svgContent, width, height) {
 }
 
 // Generar imágenes para Android
-async function generateAndroidImages(projectFolder, svgContent) {
+async function generateAndroidImages(projectFolder, imageData, isSvg = true) {
     const androidFolder = projectFolder.folder('android');
     
     // Crear carpetas mipmap
@@ -269,7 +399,7 @@ async function generateAndroidImages(projectFolder, svgContent) {
         const mipmapFolder = androidFolder.folder(`mipmap-${density}`);
         
         // Generar ic_launcher_foreground.webp
-        const foregroundBlob = await svgToImage(svgContent, size, size);
+        const foregroundBlob = await imageToWebP(imageData, size, size, isSvg);
         mipmapFolder.file('ic_launcher_foreground.webp', foregroundBlob);
         
         // Generar ic_launcher.webp (mismo que foreground)
@@ -281,13 +411,13 @@ async function generateAndroidImages(projectFolder, svgContent) {
 }
 
 // Generar imágenes para iOS
-async function generateIOSImages(projectFolder, svgContent) {
+async function generateIOSImages(projectFolder, imageData, isSvg = true) {
     const iosFolder = projectFolder.folder('ios');
     const appIconFolder = iosFolder.folder('AppIcon.appiconset');
     
     // Generar las 3 variantes de 1024x1024
     // Normal
-    const normalBlob = await svgToImage(svgContent, IOS_SIZE, IOS_SIZE);
+    const normalBlob = await imageToPNG(imageData, IOS_SIZE, IOS_SIZE, isSvg);
     appIconFolder.file('1024.png', normalBlob);
     
     // Dark (mismo para ahora, se puede personalizar después)
@@ -502,23 +632,107 @@ function hexToRgb(hex) {
     } : { r: 254, g: 80, b: 0 };
 }
 
+// Navegar entre pasos
+function goToStep(step) {
+    currentStep = step;
+    
+    // Ocultar todos los pasos
+    document.querySelectorAll('.step-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    
+    // Mostrar el paso actual
+    const stepContent = document.getElementById(`step${step}`);
+    if (stepContent) {
+        stepContent.classList.add('active');
+    }
+    
+    // Actualizar stepper
+    document.querySelectorAll('.step').forEach((stepEl, index) => {
+        const stepNum = index + 1;
+        stepEl.classList.remove('active', 'completed');
+        if (stepNum < step) {
+            stepEl.classList.add('completed');
+        } else if (stepNum === step) {
+            stepEl.classList.add('active');
+        }
+    });
+    
+    // Actualizar nombres de cliente en pasos 3 y 4
+    if (step === 3 || step === 4) {
+        const formData = getFormData();
+        const clientName = `${formData.environment}-${formData.name}`;
+        const clientNameEl = document.getElementById(`clientNameStep${step}`);
+        if (clientNameEl) {
+            clientNameEl.textContent = clientName;
+        }
+    }
+    
+    // Scroll al inicio
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Manejar copia de recursos
+async function handleCopyResources() {
+    const formData = getFormData();
+    const clientName = `${formData.environment}-${formData.name}`;
+    
+    loadingOverlay.classList.remove('hidden');
+    loadingOverlay.querySelector('p').textContent = 'Copiando recursos...';
+    
+    try {
+        // Simular llamada a Jenkins
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Aquí iría la llamada real a Jenkins
+        // await fetch('jenkins-url', { method: 'POST', body: JSON.stringify({ command: `:composeApp:importClientConfig -Pclient=${clientName}` }) });
+        
+        loadingOverlay.classList.add('hidden');
+        goToStep(4);
+    } catch (error) {
+        loadingOverlay.classList.add('hidden');
+        alert('Error al copiar recursos: ' + error.message);
+    }
+}
+
+// Manejar compilación
+async function handleBuildApp() {
+    const formData = getFormData();
+    const clientName = `${formData.environment}-${formData.name}`;
+    
+    loadingOverlay.classList.remove('hidden');
+    loadingOverlay.querySelector('p').textContent = 'Generando aplicación...';
+    
+    try {
+        // Simular llamada a Jenkins
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Aquí iría la llamada real a Jenkins
+        // await fetch('jenkins-url', { method: 'POST', body: JSON.stringify({ command: `:composeApp:buildClientBundle -Pclient=${clientName}` }) });
+        
+        loadingOverlay.classList.add('hidden');
+        alert('¡Aplicación generada exitosamente!');
+    } catch (error) {
+        loadingOverlay.classList.add('hidden');
+        alert('Error al generar aplicación: ' + error.message);
+    }
+}
+
 // Mostrar preview
-async function showPreview(formData, svgContent) {
-    // Ocultar formulario
-    form.style.display = 'none';
-    
-    // Mostrar preview
-    previewSection.classList.remove('hidden');
-    
+async function showPreview(formData, imageData, isSvg = true) {
     // Establecer nombre del proyecto
     const projectName = `${formData.environment}-${formData.name}`;
-    projectNameEl.textContent = projectName;
+    if (projectNameEl) {
+        projectNameEl.textContent = projectName;
+    }
     
     // Generar preview del icono con background
     try {
-        const iconBlob = await svgToImageWithBackground(svgContent, 128, 128, formData.fillColor);
+        const iconBlob = await imageToImageWithBackground(imageData, 128, 128, formData.fillColor, isSvg);
         const iconUrl = URL.createObjectURL(iconBlob);
-        iconPreviewEl.src = iconUrl;
+        if (iconPreviewEl) {
+            iconPreviewEl.src = iconUrl;
+        }
     } catch (error) {
         console.error('Error al generar preview del icono:', error);
     }
@@ -529,6 +743,9 @@ async function showPreview(formData, svgContent) {
     } catch (error) {
         console.error('Error al mostrar screenshot modificado:', error);
     }
+    
+    // Avanzar al paso 2
+    goToStep(2);
 }
 
 // Mostrar screenshot modificado en el preview
@@ -603,26 +820,34 @@ async function showModifiedScreenshot(formData) {
     }
     
     // Configurar botón de descarga
-    downloadBtn.onclick = () => {
-        if (generatedZipBlob) {
-            const url = URL.createObjectURL(generatedZipBlob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${projectName}.zip`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-    };
+    if (downloadBtn) {
+        downloadBtn.onclick = () => {
+            if (generatedZipBlob) {
+                const url = URL.createObjectURL(generatedZipBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${projectName}.zip`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        };
+    }
 }
 
 // Resetear formulario
 function resetForm() {
-    form.reset();
-    form.style.display = 'block';
-    previewSection.classList.add('hidden');
+    if (form) {
+        form.reset();
+    }
+    goToStep(1);
     generatedZipBlob = null;
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+// Inicializar al cargar la página
+document.addEventListener('DOMContentLoaded', () => {
+    goToStep(1);
+});
 
